@@ -1,0 +1,10 @@
+{
+  "name": "hello",
+  "description": "",
+  "version": "0.2.0",
+  "dependencies": {},
+  "devDependencies": {
+    "serverless": "^1.38.0",
+    "serverless-plugin-aws-alerts": "^1.2.4"
+  }
+}

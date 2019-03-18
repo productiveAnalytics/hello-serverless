@@ -1,0 +1,137 @@
+stages:
+  - build
+  - test
+  - deploy
+  - smoke-test
+  - remove
+  - publish
+
+cache:
+  key: "$CI_COMMIT_REF_NAME"
+  paths:
+    - .gradle/wrapper
+    - .gradle/caches
+    - node_modules/
+
+build:
+  image: java:8-jdk
+  stage: build
+  only: ['branches', 'tags', 'merge_requests']
+  before_script:
+    - export GRADLE_USER_HOME=`pwd`/.gradle
+  script: ./gradlew build
+  artifacts:
+    expire_in: 1 hour
+    paths:
+      - build/distributions/*.zip
+
+check:
+  image: java:8-jdk
+  stage: test
+  only: ['branches', 'tags', 'merge_requests']
+  before_script:
+    - export GRADLE_USER_HOME=`pwd`/.gradle
+  script: ./gradlew check
+
+deploy:
+  image: node:8.10
+  dependencies:
+    - build
+  stage: deploy
+  only:
+    - merge_requests
+  before_script:
+    - export SLS_STAGE="$(echo $CI_COMMIT_REF_NAME | tr -d '/' | tr -d '-' | tr '[:upper:]' '[:lower:]' | sed 's/feature//g')"
+    - npm i -g npm@latest serverless
+    - npm i
+  script:
+    - serverless deploy --stage $SLS_STAGE
+
+deploy:dev:
+  image: node:8.10
+  stage: deploy
+  only:
+    - develop
+  before_script:
+    - npm i -g npm@latest serverless
+    - npm i
+  script:
+    - serverless deploy # defaults to dev.
+
+deploy:prod:
+  image: node:8.10
+  stage: deploy
+  only:
+    - master
+  before_script:
+    - npm i -g npm@latest serverless
+    - npm i
+  script:
+    - serverless deploy --stage prod
+
+smoke-test:
+  image: node:8.10
+  stage: smoke-test
+  only:
+    - merge_requests
+  before_script:
+    - export SLS_STAGE="$(echo $CI_COMMIT_REF_NAME | tr -d '/' | tr -d '-' | tr '[:upper:]' '[:lower:]' | sed 's/feature//g')"
+    - npm i -g npm@latest serverless
+    - npm i
+  script:
+    - serverless invoke --function hello --stage $SLS_STAGE --path src/test/resources/event.json --log
+
+smoke-test:dev:
+  image: node:8.10
+  stage: smoke-test
+  only:
+    - develop
+  before_script:
+    - npm i -g npm@latest serverless
+    - npm i
+  script:
+    - serverless invoke --function hello --path src/test/resources/event.json --log
+
+smoke-test:prod:
+  image: node:8.10
+  stage: smoke-test
+  only:
+    - master
+  before_script:
+    - npm i -g npm@latest serverless
+    - npm i
+  script:
+    - serverless invoke --function hello --stage prod --path src/test/resources/event.json --log
+
+# A test to force a smoke test failure.
+#smoke-test-fail:
+#  image: node:8.10
+#  stage: smoke-test
+#  before_script:
+#    - export SLS_STAGE="$(echo $CI_COMMIT_REF_NAME | tr -d '/' | tr -d '-' | tr '[:upper:]' '[:lower:]' | sed 's/feature//g')"
+#    - npm i -g npm@latest serverless
+#    - npm i
+#  script:
+#    - serverless invoke --function hell --path src/test/resources/event.json --log
+
+undeploy:
+  image: node:8.10
+  dependencies:
+    - build
+  stage: remove
+  only:
+    - merge_requests
+  before_script:
+    - export SLS_STAGE="$(echo $CI_COMMIT_REF_NAME | tr -d '/' | tr -d '-' | tr '[:upper:]' '[:lower:]' | sed 's/feature//g')"
+    - npm i -g npm@latest serverless
+    - npm i
+  script:
+    - serverless remove --stage $SLS_STAGE
+
+# A useful sanity test to check your AWS Permissions :)
+#awsTest:
+#  image: python:3.7
+#  stage: deploy
+#  script:
+#    - pip install awscli
+#    - aws s3 ls

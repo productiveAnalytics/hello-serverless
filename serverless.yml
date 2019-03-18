@@ -1,0 +1,41 @@
+service: hello
+
+plugins:
+  - serverless-plugin-aws-alerts
+
+custom:
+  alerts:
+    dashboards: true
+    alarms:
+      - functionThrottles
+      - functionErrors
+      - functionInvocations
+      - functionDuration
+  config: ${file(./config.yml)}
+
+provider:
+  name: aws
+  runtime: java8
+  stage: dev
+  region: us-east-1
+  role: arn:aws:iam::560395879688:role/IMNCore-Lambda
+  versionFunctions: true
+  deploymentBucket:
+    name: imncore-chc-dev-medicaltransactions
+  stackName: ${self:custom.config.TEAM}-${self:provider.stage}-${self:service}
+  tags:
+    APP_ID: ${self:custom.config.APP_ID}
+    Description: env=${self:provider.stage}/appid=${self:custom.config.APP_ID}/team=${self:custom.config.TEAM}
+    CI_TYPE: ${self:custom.config.CI_TYPE}
+    Billing: ${self:custom.config.BILLING}
+    COST_CENTER: ${self:custom.config.COST_CENTER}
+
+package:
+  artifact: build/distributions/hello.zip
+
+functions:
+  hello:
+#    name: ${self:custom.config.TEAM}-${self:provider.stage}-hello
+    handler: com.serverless.Handler
+    environment:
+      MY_VAR: myVar
